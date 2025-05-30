@@ -1,10 +1,12 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react'
 
-export default function AuthErrorPage() {
+// Компонент с useSearchParams обернут в отдельный компонент
+function ErrorContent() {
   const searchParams = useSearchParams()
   const error = searchParams.get('error')
 
@@ -94,66 +96,94 @@ export default function AuthErrorPage() {
   const errorDetails = getErrorDetails(error)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
-          {/* Error Icon */}
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertTriangle className="w-8 h-8 text-red-600" />
-          </div>
+    <div className="max-w-md w-full">
+      <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+        {/* Error Icon */}
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <AlertTriangle className="w-8 h-8 text-red-600" />
+        </div>
 
-          {/* Error Title */}
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
-            {errorDetails.title}
-          </h1>
+        {/* Error Title */}
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          {errorDetails.title}
+        </h1>
 
-          {/* Error Description */}
-          <p className="text-gray-600 mb-6">
-            {errorDetails.description}
-          </p>
+        {/* Error Description */}
+        <p className="text-gray-600 mb-6">
+          {errorDetails.description}
+        </p>
 
-          {/* Error Code (for debugging) */}
-          {error && (
-            <div className="bg-gray-50 rounded-lg p-3 mb-6">
-              <p className="text-xs text-gray-500 font-mono">
-                Код ошибки: {error}
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                {errorDetails.technical}
-              </p>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="space-y-3">
-            {/* Try Again Button */}
-            <Link href="/auth/signin">
-              <button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-4 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium flex items-center justify-center">
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Попробовать снова
-              </button>
-            </Link>
-
-            {/* Home Button */}
-            <Link href="/">
-              <button className="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 transition-all font-medium flex items-center justify-center">
-                <Home className="w-4 h-4 mr-2" />
-                На главную
-              </button>
-            </Link>
-          </div>
-
-          {/* Help Text */}
-          <div className="mt-6 text-sm text-gray-500">
-            <p>
-              Если проблема повторяется, обратитесь в{' '}
-              <a href="mailto:support@velorabook.com" className="text-purple-600 hover:text-purple-500">
-                службу поддержки
-              </a>
+        {/* Error Code (for debugging) */}
+        {error && (
+          <div className="bg-gray-50 rounded-lg p-3 mb-6">
+            <p className="text-xs text-gray-500 font-mono">
+              Код ошибки: {error}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">
+              {errorDetails.technical}
             </p>
           </div>
+        )}
+
+        {/* Actions */}
+        <div className="space-y-3">
+          {/* Try Again Button */}
+          <Link href="/auth/signin">
+            <button className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-4 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium flex items-center justify-center">
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Попробовать снова
+            </button>
+          </Link>
+
+          {/* Home Button */}
+          <Link href="/">
+            <button className="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 transition-all font-medium flex items-center justify-center">
+              <Home className="w-4 h-4 mr-2" />
+              На главную
+            </button>
+          </Link>
+        </div>
+
+        {/* Help Text */}
+        <div className="mt-6 text-sm text-gray-500">
+          <p>
+            Если проблема повторяется, обратитесь в{' '}
+            <a href="mailto:support@velorabook.com" className="text-purple-600 hover:text-purple-500">
+              службу поддержки
+            </a>
+          </p>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Компонент загрузки
+function ErrorPageLoading() {
+  return (
+    <div className="max-w-md w-full">
+      <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-purple-600 rounded-full animate-spin"></div>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          Обрабатываем ошибку...
+        </h1>
+        <p className="text-gray-600">
+          Пожалуйста, подождите
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// Основной экспортируемый компонент
+export default function AuthErrorPage() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+      <Suspense fallback={<ErrorPageLoading />}>
+        <ErrorContent />
+      </Suspense>
     </div>
   )
 }
