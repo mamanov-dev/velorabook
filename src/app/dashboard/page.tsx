@@ -4,6 +4,7 @@ import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
   Sparkles, 
   BookOpen, 
@@ -65,10 +66,12 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 {session.user?.image ? (
-                  <img 
+                  <Image 
                     src={session.user.image} 
                     alt={session.user.name || 'Аватар'}
-                    className="w-10 h-10 rounded-full"
+                    width={40}
+                    height={40}
+                    className="rounded-full"
                   />
                 ) : (
                   <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
