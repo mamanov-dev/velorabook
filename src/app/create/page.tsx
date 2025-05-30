@@ -5,7 +5,7 @@ import { ArrowRight, ArrowLeft, Heart, Users, BookOpen, Sparkles } from 'lucide-
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useBook } from '@/contexts/BookContext';
-import ImageUploader, { ProcessedImage } from '@/components/ImageUploader';
+import ImageUploader from '@/components/ImageUploader';
 import { useImageUpload } from '@/hooks/useImageUpload';
 
 interface Question {
@@ -843,7 +843,8 @@ export default function CreateBook() {
         
         try {
           processedImages = imageUpload.getImagesForApi();
-        } catch (error) {
+        } catch (apiError) {
+          console.log('Image processing error:', apiError);
           processedImages = [];
         }
         
@@ -875,12 +876,12 @@ export default function CreateBook() {
         } else {
           throw new Error(result.error || 'Неизвестная ошибка');
         }
-      } catch (error) {
-        if (error instanceof Error) {
-          if (error.name === 'AbortError') {
+      } catch (apiError) {
+        if (apiError instanceof Error) {
+          if (apiError.name === 'AbortError') {
             alert('Генерация большой книги заняла слишком много времени. Попробуйте еще раз или выберите меньше деталей.');
           } else {
-            alert(`Ошибка: ${error.message}`);
+            alert(`Ошибка: ${apiError.message}`);
           }
         } else {
           alert('Произошла неизвестная ошибка. Попробуйте еще раз.');

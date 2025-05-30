@@ -145,7 +145,7 @@ async function generateBook(bookType: string, answers: Record<string, string>, i
     imagesCount: images.length
   });
   
-  const prompt = generateEnhancedPrompt(bookType, answers, images, []);
+  const prompt = generateEnhancedPrompt(bookType, answers, images);
   
   try {
     console.log('🤖 Отправляем запрос в OpenAI API...');
@@ -230,11 +230,11 @@ async function generateBook(bookType: string, answers: Record<string, string>, i
       const retryContent = retryCompletion.choices[0]?.message?.content;
       if (retryContent && retryContent.split(' ').length > wordCount) {
         console.log('✅ Повторная генерация успешна');
-        return structureEnhancedBook(retryContent, bookType, images, []);
+        return structureEnhancedBook(retryContent, bookType, images);
       }
     }
 
-    return structureEnhancedBook(generatedContent, bookType, images, []);
+    return structureEnhancedBook(generatedContent, bookType, images);
   } catch (error) {
     console.error('❌ Ошибка при вызове OpenAI API:', error);
     throw error;
@@ -244,8 +244,7 @@ async function generateBook(bookType: string, answers: Record<string, string>, i
 function generateEnhancedPrompt(
   bookType: string, 
   answers: Record<string, string>, 
-  images: ImageData[], 
-  imageAnalysis: string[]
+  images: ImageData[]
 ): string {
   
   // Создаем описание изображений
@@ -350,8 +349,7 @@ ${imageSection}
 function structureEnhancedBook(
   content: string, 
   bookType: string, 
-  images: ImageData[],
-  imageAnalysis: string[]
+  images: ImageData[]
 ): GeneratedBook {
   
   console.log('Структурируем сгенерированную книгу...');
@@ -459,7 +457,7 @@ function structureEnhancedBook(
     images: images.length > 0 ? images.map((img, index) => ({
       url: img.base64,
       caption: `Фотография ${index + 1}`,
-      description: imageAnalysis[index] || 'Особенный момент из вашей истории',
+      description: 'Особенный момент из вашей истории',
       originalName: img.name,
       size: img.size
     })) : undefined,
@@ -467,8 +465,7 @@ function structureEnhancedBook(
       bookType,
       generatedAt: new Date().toISOString(),
       wordCount: finalWordCount,
-      imagesCount: images.length,
-      imageAnalysis: imageAnalysis.length > 0 ? imageAnalysis : undefined
+      imagesCount: images.length
     }
   };
   

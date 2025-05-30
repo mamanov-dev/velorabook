@@ -223,9 +223,7 @@ export default function ImageUploader({
         console.log('✅ Все файлы обработаны успешно');
       } else {
         console.warn('⚠️ Ни один файл не был обработан');
-        if (!error) {
-          setError('Ни один файл не был добавлен. Проверьте формат и размер файлов.');
-        }
+        setError(prevError => prevError || 'Ни один файл не был добавлен. Проверьте формат и размер файлов.');
       }
       
     } catch (err) {

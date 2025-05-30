@@ -68,7 +68,7 @@ export default function EnhancedBookViewer() {
     if (navigator.share) {
       navigator.share({
         title: book.title,
-        text: `Посмотрите мою персональную книгу "${book.title}" созданную с помощью ИИ!`,
+        text: `Посмотрите мою персональную книгу &ldquo;${book.title}&rdquo; созданную с помощью ИИ!`,
         url: window.location.href
       });
     } else {
@@ -646,7 +646,7 @@ export default function EnhancedBookViewer() {
           <div className="bg-white rounded-2xl shadow-lg p-8">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Изображения из книги "{book.title}"
+                Изображения из книги &ldquo;{book.title}&rdquo;
               </h2>
               <p className="text-gray-600">
                 {hasImages ? `${book.images!.length} изображений в вашей истории` : 'Изображения не загружены'}
@@ -825,7 +825,7 @@ export default function EnhancedBookViewer() {
               
               {currentChapterData.epigraph && (
                 <blockquote className="text-gray-600 italic text-center max-w-md mx-auto">
-                  "{currentChapterData.epigraph}"
+                  &ldquo;{currentChapterData.epigraph}&rdquo;
                 </blockquote>
               )}
             </div>

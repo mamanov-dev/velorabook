@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react';
+import Image from 'next/image';
 
 interface BookImage {
   url: string;
@@ -69,11 +70,16 @@ function ImageModal({
 
       {/* Image Container */}
       <div className="max-w-4xl max-h-full flex flex-col">
-        <img
-          src={image.url}
-          alt={image.caption || 'Изображение из книги'}
-          className="max-w-full max-h-[80vh] object-contain rounded-lg"
-        />
+        <div className="relative max-h-[80vh] max-w-full">
+          <Image
+            src={image.url}
+            alt={image.caption || 'Изображение из книги'}
+            width={800}
+            height={600}
+            className="max-w-full max-h-[80vh] object-contain rounded-lg"
+            style={{ width: 'auto', height: 'auto' }}
+          />
+        </div>
         
         {/* Image Info */}
         {(image.caption || image.description) && (
@@ -142,14 +148,17 @@ export default function BookImageGallery({ images, className = '' }: BookImageGa
         {images.length === 1 && (
           <div className="flex justify-center">
             <div className="relative group max-w-md">
-              <img
-                src={images[0].url}
-                alt={images[0].caption || 'Изображение'}
-                className="w-full rounded-lg shadow-lg cursor-zoom-in transition-transform group-hover:scale-105"
-                onClick={() => openModal(0)}
-              />
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative w-full h-64 cursor-zoom-in">
+                <Image
+                  src={images[0].url}
+                  alt={images[0].caption || 'Изображение'}
+                  fill
+                  className="rounded-lg shadow-lg object-cover transition-transform group-hover:scale-105"
+                  onClick={() => openModal(0)}
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
+                  <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
               </div>
               {images[0].caption && (
                 <p className="text-center text-sm text-gray-600 mt-2 italic">
@@ -170,10 +179,11 @@ export default function BookImageGallery({ images, className = '' }: BookImageGa
             {images.map((image, index) => (
               <div key={index} className="relative group">
                 <div className="aspect-square relative overflow-hidden rounded-lg shadow-md">
-                  <img
+                  <Image
                     src={image.url}
                     alt={image.caption || `Изображение ${index + 1}`}
-                    className="w-full h-full object-cover cursor-zoom-in transition-transform group-hover:scale-110"
+                    fill
+                    className="object-cover cursor-zoom-in transition-transform group-hover:scale-110"
                     onClick={() => openModal(index)}
                   />
                   <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
@@ -219,7 +229,11 @@ export default function BookImageGallery({ images, className = '' }: BookImageGa
 // Utility функции для работы с изображениями в книге
 export const BookImageUtils = {
   // Конвертация ProcessedImage в BookImage  
-  convertProcessedImages: (processedImages: any[], analysisResults?: string[]): BookImage[] => {
+  convertProcessedImages: (processedImages: Array<{
+    preview?: string;
+    base64: string;
+    file: { name: string };
+  }>, analysisResults?: string[]): BookImage[] => {
     return processedImages.map((img, index) => ({
       url: img.preview || img.base64,
       caption: `Фотография ${index + 1}`,
