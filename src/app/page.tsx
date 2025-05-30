@@ -1,7 +1,16 @@
-import { Sparkles, Star, Clock, Globe, Heart, Users, BookOpen, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+'use client'
+
+import { useSession, signOut } from 'next-auth/react'
+import { Sparkles, Star, Clock, Globe, Heart, Users, BookOpen, ArrowRight, User, LogOut, Settings } from 'lucide-react'
+import Link from 'next/link'
 
 export default function Home() {
+  const { data: session, status } = useSession()
+
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: '/' })
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
       {/* Header */}
@@ -13,13 +22,65 @@ export default function Home() {
               VeloraBook
             </h1>
           </Link>
-          <nav className="hidden md:flex space-x-6">
+          <nav className="hidden md:flex space-x-6 items-center">
             <a href="#how-it-works" className="text-gray-600 hover:text-purple-600">Как работает</a>
             <a href="#book-types" className="text-gray-600 hover:text-purple-600">Примеры</a>
             <a href="#pricing" className="text-gray-600 hover:text-purple-600">Цены</a>
-            <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-              Войти
-            </button>
+            
+            {status === 'loading' ? (
+              <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+            ) : session ? (
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  {session.user?.image ? (
+                    <img 
+                      src={session.user.image} 
+                      alt={session.user.name || 'Аватар'}
+                      className="w-8 h-8 rounded-full"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                      <User className="w-4 h-4 text-purple-600" />
+                    </div>
+                  )}
+                  <span className="text-sm font-medium text-gray-700">
+                    {session.user?.name?.split(' ')[0] || 'Пользователь'}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Link href="/dashboard">
+                    <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                      Дашборд
+                    </button>
+                  </Link>
+                  <Link href="/profile">
+                    <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
+                      <Settings className="w-4 h-4" />
+                    </button>
+                  </Link>
+                  <button 
+                    onClick={handleSignOut}
+                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                    title="Выйти"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-3">
+                <Link href="/auth/signin">
+                  <button className="text-gray-600 hover:text-purple-600 transition-colors">
+                    Войти
+                  </button>
+                </Link>
+                <Link href="/auth/signup">
+                  <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                    Регистрация
+                  </button>
+                </Link>
+              </div>
+            )}
           </nav>
         </div>
       </header>
@@ -52,12 +113,30 @@ export default function Home() {
             </div>
           </div>
 
-          <Link href="/create">
-            <button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:from-purple-700 hover:to-blue-700 transform hover:scale-105 transition-all shadow-lg">
-              Создать мою книгу
-              <ArrowRight className="w-5 h-5 ml-2 inline" />
-            </button>
-          </Link>
+          {session ? (
+            <Link href="/dashboard">
+              <button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:from-purple-700 hover:to-blue-700 transform hover:scale-105 transition-all shadow-lg">
+                Перейти в дашборд
+                <ArrowRight className="w-5 h-5 ml-2 inline" />
+              </button>
+            </Link>
+          ) : (
+            <div className="space-y-4">
+              <Link href="/create">
+                <button className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:from-purple-700 hover:to-blue-700 transform hover:scale-105 transition-all shadow-lg">
+                  Создать мою книгу
+                  <ArrowRight className="w-5 h-5 ml-2 inline" />
+                </button>
+              </Link>
+              <p className="text-sm text-gray-500">
+                Или{' '}
+                <Link href="/auth/signup" className="text-purple-600 hover:text-purple-500 font-medium">
+                  зарегистрируйтесь
+                </Link>
+                {' '}для сохранения ваших книг
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -69,7 +148,7 @@ export default function Home() {
         
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {/* Romantic Book */}
-          <Link href="/create?type=romantic">
+          <Link href={session ? "/create?type=romantic" : "/auth/signin?callbackUrl=/create?type=romantic"}>
             <div className="group bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100 cursor-pointer">
               <div className="w-16 h-16 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Heart className="w-8 h-8 text-white" />
@@ -92,7 +171,7 @@ export default function Home() {
           </Link>
 
           {/* Family Book */}
-          <Link href="/create?type=family">
+          <Link href={session ? "/create?type=family" : "/auth/signin?callbackUrl=/create?type=family"}>
             <div className="group bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100 cursor-pointer">
               <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Users className="w-8 h-8 text-white" />
@@ -115,7 +194,7 @@ export default function Home() {
           </Link>
 
           {/* Friendship Book */}
-          <Link href="/create?type=friendship">
+          <Link href={session ? "/create?type=friendship" : "/auth/signin?callbackUrl=/create?type=friendship"}>
             <div className="group bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-100 cursor-pointer">
               <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <BookOpen className="w-8 h-8 text-white" />
@@ -181,14 +260,40 @@ export default function Home() {
           </div>
 
           <div className="text-center mt-12">
-            <Link href="/create">
+            <Link href={session ? "/dashboard" : "/auth/signup"}>
               <button className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors">
-                Начать создание
+                {session ? "Перейти в дашборд" : "Начать создание"}
               </button>
             </Link>
           </div>
         </div>
       </section>
+
+      {/* Auth CTA Section (only for non-authenticated users) */}
+      {!session && (
+        <section className="bg-gradient-to-r from-purple-600 to-blue-600 py-16 text-white">
+          <div className="container mx-auto px-4 text-center">
+            <h3 className="text-3xl font-bold mb-4">
+              Готовы создать свою уникальную книгу?
+            </h3>
+            <p className="text-xl mb-8 opacity-90">
+              Зарегистрируйтесь сейчас и получите доступ ко всем возможностям VeloraBook
+            </p>
+            <div className="flex justify-center space-x-4">
+              <Link href="/auth/signup">
+                <button className="bg-white text-purple-600 px-8 py-3 rounded-lg hover:bg-gray-100 transition-colors font-semibold">
+                  Создать аккаунт
+                </button>
+              </Link>
+              <Link href="/auth/signin">
+                <button className="border-2 border-white text-white px-8 py-3 rounded-lg hover:bg-white hover:text-purple-600 transition-colors font-semibold">
+                  Уже есть аккаунт
+                </button>
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">

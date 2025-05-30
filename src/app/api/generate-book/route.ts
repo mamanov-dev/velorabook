@@ -1,6 +1,7 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/auth';
 import OpenAI from 'openai';
 
 // Явное получение API ключа
@@ -45,6 +46,7 @@ interface GeneratedBook {
   dedicatedTo?: string;
   bookType: string;
   createdAt: string;
+  userId?: string; // Добавляем ID пользователя
   images?: Array<{
     url: string;
     caption?: string;
@@ -58,6 +60,7 @@ interface GeneratedBook {
     wordCount: number;
     imagesCount: number;
     imageAnalysis?: string[];
+    userId?: string; // Добавляем ID пользователя в метаданные
   };
 }
 
@@ -72,12 +75,34 @@ const GENERATION_TIMEOUT = 180000; // 3 минуты для объемных к�
 
 export async function POST(request: NextRequest) {
   try {
+    // ✅ НОВОЕ: Проверяем аутентификацию пользователя
+    const session = await auth();
+    
+    if (!session || !session.user) {
+      console.log('🚫 Неавторизованный доступ к API генерации книг');
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Необходимо войти в систему для создания книг',
+          code: 'UNAUTHORIZED'
+        },
+        { status: 401 }
+      );
+    }
+
+    console.log('✅ Пользователь авторизован:', {
+      userId: session.user.id,
+      email: session.user.email,
+      name: session.user.name
+    });
+
     const { bookType, answers, images = [] }: RequestBody = await request.json();
     
     console.log('🔍 API вызван с параметрами:', {
       bookType,
       answersCount: Object.keys(answers).length,
       imagesCount: images.length,
+      userId: session.user.id,
       apiKeyExists: !!process.env.OPENAI_API_KEY
     });
 
@@ -95,13 +120,13 @@ export async function POST(request: NextRequest) {
       }, GENERATION_TIMEOUT);
     });
 
-    // Создаем Promise для генерации
-    const generatePromise = generateBook(bookType, answers, images);
+    // Создаем Promise для генерации с данными пользователя
+    const generatePromise = generateBook(bookType, answers, images, session.user);
 
     // Используем Promise.race для ограничения времени выполнения
     const result = await Promise.race([generatePromise, timeoutPromise]);
     
-    console.log('✅ Генерация книги успешно завершена');
+    console.log('✅ Генерация книги успешно завершена для пользователя:', session.user.email);
     return NextResponse.json({ success: true, book: result });
   } catch (error) {
     console.error('❌ Ошибка генерации книги:', error);
@@ -137,12 +162,18 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function generateBook(bookType: string, answers: Record<string, string>, images: ImageData[]) {
-  console.log('🔄 Начинаем генерацию книги...');
+async function generateBook(
+  bookType: string, 
+  answers: Record<string, string>, 
+  images: ImageData[],
+  user: { id?: string; name?: string | null; email?: string | null }
+) {
+  console.log('🔄 Начинаем генерацию книги для пользователя:', user.email);
   console.log('📊 Параметры:', { 
     bookType, 
     answersKeys: Object.keys(answers),
-    imagesCount: images.length
+    imagesCount: images.length,
+    userId: user.id
   });
   
   const prompt = generateEnhancedPrompt(bookType, answers, images);
@@ -182,18 +213,19 @@ async function generateBook(bookType: string, answers: Record<string, string>, i
           content: prompt
         }
       ],
-      max_tokens: 12000, // ✅ Увеличено с 4000 до 12000
+      max_tokens: 12000,
       temperature: 0.8,
     });
 
-    console.log('✅ Ответ от OpenAI API получен успешно');
+    console.log('✅ Ответ от OpenAI API получен успешно для пользователя:', user.email);
     
-    // ✅ НОВОЕ: Логируем информацию о токенах
+    // Логируем информацию о токенах
     if (completion.usage) {
       console.log('🔢 Использование токенов:', {
         prompt_tokens: completion.usage.prompt_tokens,
         completion_tokens: completion.usage.completion_tokens,
-        total_tokens: completion.usage.total_tokens
+        total_tokens: completion.usage.total_tokens,
+        userId: user.id
       });
     }
     
@@ -203,9 +235,9 @@ async function generateBook(bookType: string, answers: Record<string, string>, i
       throw new Error('Не удалось сгенерировать книгу - пустой ответ от API');
     }
 
-    // ✅ НОВОЕ: Проверяем полноту ответа
+    // Проверяем полноту ответа
     const wordCount = generatedContent.split(' ').length;
-    console.log(`📝 Сгенерировано слов: ${wordCount}`);
+    console.log(`📝 Сгенерировано слов: ${wordCount} для пользователя: ${user.email}`);
     
     if (wordCount < 2000) {
       console.warn('⚠️ Сгенерированный контент слишком короткий, попробуем повторить...');
@@ -229,14 +261,14 @@ async function generateBook(bookType: string, answers: Record<string, string>, i
       
       const retryContent = retryCompletion.choices[0]?.message?.content;
       if (retryContent && retryContent.split(' ').length > wordCount) {
-        console.log('✅ Повторная генерация успешна');
-        return structureEnhancedBook(retryContent, bookType, images);
+        console.log('✅ Повторная генерация успешна для пользователя:', user.email);
+        return structureEnhancedBook(retryContent, bookType, images, user);
       }
     }
 
-    return structureEnhancedBook(generatedContent, bookType, images);
+    return structureEnhancedBook(generatedContent, bookType, images, user);
   } catch (error) {
-    console.error('❌ Ошибка при вызове OpenAI API:', error);
+    console.error('❌ Ошибка при вызове OpenAI API для пользователя:', user.email, error);
     throw error;
   }
 }
@@ -345,14 +377,14 @@ ${imageSection}
   }
 }
 
-// ✅ ИСПРАВЛЕНО: Заменил matchAll() на совместимую версию
 function structureEnhancedBook(
   content: string, 
   bookType: string, 
-  images: ImageData[]
+  images: ImageData[],
+  user: { id?: string; name?: string | null; email?: string | null }
 ): GeneratedBook {
   
-  console.log('Структурируем сгенерированную книгу...');
+  console.log('Структурируем сгенерированную книгу для пользователя:', user.email);
   console.log('📝 Общий объем контента:', content.length, 'символов');
   console.log('📝 Количество слов:', content.split(' ').length);
   
@@ -360,7 +392,6 @@ function structureEnhancedBook(
   const titleMatch = content.match(/НАЗВАНИЕ КНИГИ:\s*(.+)/i);
   const bookTitle = titleMatch ? titleMatch[1].trim() : getDefaultBookTitle(bookType);
   
-  // ✅ ИСПРАВЛЕНО: Убрал флаг 's' и заменил matchAll() на exec()
   let chapters: string[] = [];
   
   // Сначала пробуем разбить по "ГЛАВА X:" без флага 's'
@@ -402,7 +433,7 @@ function structureEnhancedBook(
     }
   }
 
-  console.log('📖 Найдено глав:', chapters.length);
+  console.log('📖 Найдено глав:', chapters.length, 'для пользователя:', user.email);
 
   const structuredChapters = chapters.map((chapter, index) => {
     // Очищаем содержимое главы
@@ -439,7 +470,7 @@ function structureEnhancedBook(
   });
 
   const finalWordCount = content.split(' ').length;
-  console.log('📊 Финальная статистика:', {
+  console.log('📊 Финальная статистика для пользователя', user.email, ':', {
     chapters: structuredChapters.length,
     totalWords: finalWordCount,
     averageWordsPerChapter: Math.round(finalWordCount / structuredChapters.length)
@@ -454,6 +485,7 @@ function structureEnhancedBook(
     dedicatedTo: getDedicationText(bookType),
     bookType,
     createdAt: new Date().toISOString(),
+    userId: user.id, // ✅ НОВОЕ: Добавляем ID пользователя
     images: images.length > 0 ? images.map((img, index) => ({
       url: img.base64,
       caption: `Фотография ${index + 1}`,
@@ -465,11 +497,12 @@ function structureEnhancedBook(
       bookType,
       generatedAt: new Date().toISOString(),
       wordCount: finalWordCount,
-      imagesCount: images.length
+      imagesCount: images.length,
+      userId: user.id // ✅ НОВОЕ: Добавляем ID пользователя в метаданные
     }
   };
   
-  console.log('✅ Структурирование завершено');
+  console.log('✅ Структурирование завершено для пользователя:', user.email);
   
   return finalBook;
 }

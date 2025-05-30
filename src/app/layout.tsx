@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { BookProvider } from '@/contexts/BookContext'
+import { SessionProvider } from 'next-auth/react'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,9 +27,11 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className={inter.className}>
-        <BookProvider>
-          {children}
-        </BookProvider>
+        <SessionProvider>
+          <BookProvider>
+            {children}
+          </BookProvider>
+        </SessionProvider>
       </body>
     </html>
   )
