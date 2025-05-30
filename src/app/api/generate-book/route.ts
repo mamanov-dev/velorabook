@@ -72,7 +72,7 @@ const GENERATION_TIMEOUT = 180000; // 3 минуты для объемных к�
 
 export async function POST(request: NextRequest) {
   try {
-    const { bookType, answers, images = [] } = await request.json();
+    const { bookType, answers, images = [] }: RequestBody = await request.json();
     
     console.log('🔍 API вызван с параметрами:', {
       bookType,
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Создаем Promise с таймаутом
-    const timeoutPromise = new Promise((_, reject) => {
+    const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
         reject(new Error('Timeout'));
       }, GENERATION_TIMEOUT);
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function generateBook(bookType: string, answers: Record<string, string>, images: any[]) {
+async function generateBook(bookType: string, answers: Record<string, string>, images: ImageData[]) {
   console.log('🔄 Начинаем генерацию книги...');
   console.log('📊 Параметры:', { 
     bookType, 
@@ -256,7 +256,7 @@ function generateEnhancedPrompt(
 
   // Собираем ключевую информацию в сжатом виде
   const keyAnswers = Object.entries(answers)
-    .filter(([key, value]) => value && value.length > 10)
+    .filter(([, value]) => value && value.length > 10)
     .map(([key, value]) => `${key}: ${value}`)
     .join('\n');
 

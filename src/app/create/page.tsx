@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, Upload, Heart, Users, BookOpen, Sparkles } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Heart, Users, BookOpen, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useBook } from '@/contexts/BookContext';
@@ -843,7 +843,7 @@ export default function CreateBook() {
         
         try {
           processedImages = imageUpload.getImagesForApi();
-        } catch (imgError) {
+        } catch (error) {
           processedImages = [];
         }
         

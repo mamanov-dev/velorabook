@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, X, RotateCcw, Move, Download, AlertCircle } from 'lucide-react';
+import { X, RotateCcw, Move, AlertCircle } from 'lucide-react';
+import Image from 'next/image';
 
 export interface ProcessedImage {
   id: string;
@@ -48,7 +49,7 @@ export default function ImageUploader({
         return;
       }
       
-      const img = new Image();
+      const img = new window.Image();
       
       img.onload = () => {
         // Вычисляем новые размеры с сохранением пропорций
@@ -87,7 +88,7 @@ export default function ImageUploader({
 
   const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
     return new Promise((resolve, reject) => {
-      const img = new Image();
+      const img = new window.Image();
       img.onload = () => {
         resolve({ width: img.width, height: img.height });
         URL.revokeObjectURL(img.src);
@@ -100,8 +101,8 @@ export default function ImageUploader({
     });
   };
 
-  // ✅ УЛУЧШЕНО: Расширенная обработка файлов с отладкой
-  const processFiles = async (files: FileList | File[]) => {
+  // ✅ ИСПРАВЛЕНО: Расширенная обработка файлов с отладкой
+  const processFiles = useCallback(async (files: FileList | File[]) => {
     console.log('📁 Начинаем обработку файлов:', {
       filesCount: files.length,
       currentImagesCount: images.length,
@@ -234,7 +235,7 @@ export default function ImageUploader({
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [images, maxFiles, maxSizeBytes, acceptedFormats, onImagesChange]);
 
   // Удаление изображения
   const removeImage = (id: string) => {
@@ -283,7 +284,7 @@ export default function ImageUploader({
       console.log('📂 Файлы перетащены:', e.dataTransfer.files.length);
       processFiles(e.dataTransfer.files);
     }
-  }, [disabled]);
+  }, [disabled, processFiles]);
 
   // File input handler
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -334,7 +335,11 @@ export default function ImageUploader({
           </div>
         ) : (
           <>
-            <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+            <div className="w-8 h-8 text-gray-400 mx-auto mb-2">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
             <p className="text-gray-600 mb-2">
               Перетащите изображения сюда или нажмите для выбора
             </p>
@@ -372,10 +377,12 @@ export default function ImageUploader({
             >
               {/* Image Preview */}
               <div className="aspect-square relative">
-                <img
+                <Image
                   src={image.preview}
                   alt={`Preview ${index + 1}`}
-                  className="w-full h-full object-cover"
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 />
                 
                 {/* Overlay */}
