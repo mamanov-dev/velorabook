@@ -129,7 +129,8 @@ export const userService = {
     users.push(newUser)
 
     // Возвращаем пользователя без пароля
-    const { password: _, ...userWithoutPassword } = newUser
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = newUser
     return userWithoutPassword
   },
 
@@ -137,11 +138,13 @@ export const userService = {
     const user = users.find(u => u.email === email)
     if (!user) return null
     
-    const { password: _, ...userWithoutPassword } = user
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = user
     return userWithoutPassword
   },
 
   async getAllUsers(): Promise<User[]> {
-    return users.map(({ password: _, ...user }) => user)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    return users.map(({ password, ...user }) => user)
   }
 }
