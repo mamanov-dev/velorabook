@@ -1,15 +1,15 @@
 'use client'
 
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
   User, 
   Mail, 
   Calendar, 
   Shield, 
-  Settings,
   ArrowLeft,
   Edit,
   Save,
@@ -84,7 +84,7 @@ export default function ProfilePage() {
 
       setMessage({ type: 'success', text: 'Профиль успешно обновлен!' })
       setIsEditing(false)
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Ошибка при обновлении профиля' })
     } finally {
       setIsLoading(false)
@@ -164,10 +164,12 @@ export default function ProfilePage() {
             <div className="flex items-center space-x-6 mb-8 pb-8 border-b border-gray-200">
               <div className="relative">
                 {session.user?.image ? (
-                  <img 
+                  <Image 
                     src={session.user.image} 
                     alt={session.user.name || 'Аватар'}
-                    className="w-20 h-20 rounded-full"
+                    width={80}
+                    height={80}
+                    className="rounded-full"
                   />
                 ) : (
                   <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center">

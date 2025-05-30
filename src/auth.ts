@@ -129,7 +129,7 @@ export const userService = {
     users.push(newUser)
 
     // Возвращаем пользователя без пароля
-    const { password, ...userWithoutPassword } = newUser
+    const { password: _, ...userWithoutPassword } = newUser
     return userWithoutPassword
   },
 
@@ -137,11 +137,11 @@ export const userService = {
     const user = users.find(u => u.email === email)
     if (!user) return null
     
-    const { password, ...userWithoutPassword } = user
+    const { password: _, ...userWithoutPassword } = user
     return userWithoutPassword
   },
 
   async getAllUsers(): Promise<User[]> {
-    return users.map(({ password, ...user }) => user)
+    return users.map(({ password: _, ...user }) => user)
   }
 }
