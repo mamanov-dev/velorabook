@@ -9,7 +9,7 @@ import { UserLoginSchema } from '@/lib/validation'
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
-    strategy: 'jwt' // ВАЖНО: явно указываем JWT стратегию
+    strategy: 'jwt'
   },
   
   providers: [
@@ -61,7 +61,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             id: user.id,
             email: user.email,
             name: user.name,
-            image: user.image,
+            image: user.image ?? undefined, // Конвертируем null в undefined
           }
         } catch (error) {
           console.error('❌ Auth error:', error)
@@ -105,7 +105,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 
-  debug: process.env.NODE_ENV === 'development', // Включаем отладку
+  debug: process.env.NODE_ENV === 'development',
   secret: process.env.NEXTAUTH_SECRET,
 })
 
