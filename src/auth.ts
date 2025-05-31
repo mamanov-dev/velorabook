@@ -2,34 +2,34 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import Google from 'next-auth/providers/google'
 import bcrypt from 'bcryptjs'
-
-// Проверка доступности базы данных
-const isDatabaseAvailable = process.env.DATABASE_URL && 
-  process.env.DATABASE_URL !== 'placeholder' && 
-  !process.env.DATABASE_URL.includes('placeholder')
+import { env, serviceAvailability } from '@/lib/env'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: {
-    strategy: 'jwt'
+    strategy: 'jwt',
+    maxAge: 24 * 60 * 60, // 24 часа
   },
-  
+
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    }),
-    
+    ...(serviceAvailability.googleAuth ? [
+      Google({
+        clientId: env.GOOGLE_CLIENT_ID!,
+        clientSecret: env.GOOGLE_CLIENT_SECRET!,
+      })
+    ] : []),
+
     Credentials({
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
+        password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(raw) {
         try {
-          // Демо пользователь для build time и fallback
-          if (credentials?.email === 'demo@velorabook.com' && 
-              credentials?.password === 'demo123') {
+          const rawEmail = raw?.email
+          const rawPassword = raw?.password
+
+          if (rawEmail === 'demo@velorabook.com' && rawPassword === 'demo123') {
             return {
               id: 'demo-user-id',
               email: 'demo@velorabook.com',
@@ -38,29 +38,63 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
           }
 
-          // Если база недоступна, только демо пользователь
-          if (!isDatabaseAvailable) {
+          if (!serviceAvailability.database) {
+            console.warn('⚠️ Database not available, only demo user allowed')
             return null
           }
 
-          // Динамический импорт для продакшена
-          const { prisma } = await import('@/lib/prisma')
-          const { UserLoginSchema } = await import('@/lib/validation')
+          if (!rawEmail || !rawPassword || typeof rawEmail !== 'string' || typeof rawPassword !== 'string') {
+            console.error('❌ Missing or invalid credentials')
+            return null
+          }
 
-          const validatedFields = UserLoginSchema.safeParse(credentials)
-          if (!validatedFields.success) return null
+          const [{ prisma }, { UserLoginSchema }] = await Promise.all([
+            import('@/lib/prisma'),
+            import('@/lib/validation')
+          ])
+
+          const validatedFields = UserLoginSchema.safeParse({
+            email: rawEmail,
+            password: rawPassword,
+          })
+
+          if (!validatedFields.success) {
+            console.error('❌ Invalid credentials format:', validatedFields.error.errors)
+            return null
+          }
 
           const { email, password } = validatedFields.data
 
           const user = await prisma.user.findUnique({
             where: { email: email.toLowerCase() },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              image: true,
+              password: true,
+              isVerified: true,
+            }
           })
 
-          if (!user || !user.password) return null
+          if (!user || !user.password) {
+            console.error('❌ User not found or no password set')
+            return null
+          }
 
-          const isValid = await bcrypt.compare(password, user.password)
-          if (!isValid) return null
+          const isValid = await Promise.race([
+            bcrypt.compare(password, user.password),
+            new Promise<boolean>((_, reject) =>
+              setTimeout(() => reject(new Error('bcrypt timeout')), 5000)
+            )
+          ])
 
+          if (!isValid) {
+            console.error('❌ Invalid password')
+            return null
+          }
+
+          console.log('✅ User authenticated:', user.email)
           return {
             id: user.id,
             email: user.email,
@@ -68,10 +102,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             image: user.image ?? undefined,
           }
         } catch (error) {
-          console.error('Auth error:', error)
+          console.error('❌ Auth error:', error)
           return null
         }
-      }
+      },
     })
   ],
 
@@ -81,16 +115,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 
   callbacks: {
-    async jwt({ user, token }) {
+    async jwt({ user, token, trigger, session }) {
       if (user) {
         token.id = user.id
         token.email = user.email
         token.name = user.name
         token.image = user.image
       }
+      if (trigger === 'update' && session) {
+        token.name = session.user.name
+        token.image = session.user.image
+      }
       return token
     },
-    
+
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
@@ -100,48 +138,55 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return session
     },
+
+    async signIn({ user, account, profile }) {
+      if (env.NODE_ENV === 'development') {
+        console.log('🔐 Sign in attempt:', {
+          provider: account?.provider,
+          email: user.email,
+          userId: user.id,
+        })
+      }
+      return true
+    },
   },
 
-  secret: process.env.NEXTAUTH_SECRET,
-})
-
-export const userService = {
-  async createUser(userData: { name: string; email: string; password: string }) {
-    if (!isDatabaseAvailable) {
-      throw new Error('Регистрация временно недоступна')
-    }
-
-    try {
-      const { prisma } = await import('@/lib/prisma')
-      
-      const existingUser = await prisma.user.findUnique({
-        where: { email: userData.email.toLowerCase() }
-      })
-
-      if (existingUser) {
-        throw new Error('Пользователь с таким email уже существует')
+  events: {
+    async signIn({ user, account, isNewUser }) {
+      if (env.NODE_ENV === 'development') {
+        console.log('✅ User signed in:', {
+          email: user.email,
+          provider: account?.provider,
+          isNewUser,
+        })
       }
-
-      const hashedPassword = await bcrypt.hash(userData.password, 12)
-
-      return await prisma.user.create({
-        data: {
-          name: userData.name,
-          email: userData.email.toLowerCase(),
-          password: hashedPassword,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          createdAt: true,
+    },
+    async signOut(params) {
+      if (env.NODE_ENV === 'development') {
+        let email = 'unknown'
+        if ('token' in params && params.token?.email) {
+          email = params.token.email as string
+        } else if ('session' in params && params.session) {
+          email = (params.session as any)?.user?.email || 'session-user'
         }
-      })
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error
+        console.log('👋 User signed out:', email)
       }
-      throw new Error('Ошибка создания пользователя')
-    }
-  }
-}
+    },
+  },
+
+  secret: env.NEXTAUTH_SECRET,
+
+  useSecureCookies: env.NODE_ENV === 'production',
+  cookies: {
+    sessionToken: {
+      name: `${env.NODE_ENV === 'production' ? '__Secure-' : ''}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: env.NODE_ENV === 'production',
+      },
+    },
+  },
+})
+export { userService } from '@/services/user'

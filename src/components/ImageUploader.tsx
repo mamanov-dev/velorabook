@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
-import { X, RotateCcw, Move, AlertCircle } from 'lucide-react';
+import { X, RotateCcw, Move, AlertCircle, Shield } from 'lucide-react';
 import Image from 'next/image';
 
 export interface ProcessedImage {
@@ -13,6 +13,7 @@ export interface ProcessedImage {
   originalSize: number;
   compressedSize: number;
   dimensions: { width: number; height: number };
+  isSecure: boolean; // Новое поле для отметки безопасности
 }
 
 interface ImageUploaderProps {
@@ -23,6 +24,91 @@ interface ImageUploaderProps {
   initialImages?: ProcessedImage[];
   disabled?: boolean;
 }
+
+// Проверка magic bytes файлов
+const validateImageFile = async (file: File): Promise<boolean> => {
+  try {
+    const buffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(buffer);
+    
+    // Проверяем magic bytes для различных форматов
+    const magicBytes = {
+      jpeg: [0xFF, 0xD8, 0xFF],
+      png: [0x89, 0x50, 0x4E, 0x47],
+      webp: [0x52, 0x49, 0x46, 0x46], // RIFF (WebP начинается с RIFF)
+      gif: [0x47, 0x49, 0x46], // GIF
+    };
+
+    // Проверяем JPEG
+    if (uint8Array[0] === magicBytes.jpeg[0] && 
+        uint8Array[1] === magicBytes.jpeg[1] && 
+        uint8Array[2] === magicBytes.jpeg[2]) {
+      return true;
+    }
+
+    // Проверяем PNG
+    if (uint8Array[0] === magicBytes.png[0] && 
+        uint8Array[1] === magicBytes.png[1] && 
+        uint8Array[2] === magicBytes.png[2] && 
+        uint8Array[3] === magicBytes.png[3]) {
+      return true;
+    }
+
+    // Проверяем WebP (сложнее - нужно проверить RIFF + WEBP)
+    if (uint8Array[0] === magicBytes.webp[0] && 
+        uint8Array[1] === magicBytes.webp[1] && 
+        uint8Array[2] === magicBytes.webp[2] && 
+        uint8Array[3] === magicBytes.webp[3] &&
+        uint8Array[8] === 0x57 && // W
+        uint8Array[9] === 0x45 && // E
+        uint8Array[10] === 0x42 && // B
+        uint8Array[11] === 0x50) { // P
+      return true;
+    }
+
+    // Проверяем GIF
+    if (uint8Array[0] === magicBytes.gif[0] && 
+        uint8Array[1] === magicBytes.gif[1] && 
+        uint8Array[2] === magicBytes.gif[2]) {
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Error validating image file:', error);
+    return false;
+  }
+};
+
+// Проверка на подозрительное содержимое
+const checkForSuspiciousContent = (file: File): boolean => {
+  // Проверяем расширение файла
+  const suspiciousExtensions = ['.exe', '.bat', '.cmd', '.scr', '.pif', '.com', '.js'];
+  const filename = file.name.toLowerCase();
+  
+  return !suspiciousExtensions.some(ext => filename.includes(ext));
+};
+
+// Продвинутая проверка размеров
+const validateImageDimensions = (width: number, height: number): { valid: boolean; reason?: string } => {
+  // Минимальные размеры (избегаем пиксельные изображения)
+  if (width < 50 || height < 50) {
+    return { valid: false, reason: 'Изображение слишком маленькое (минимум 50x50px)' };
+  }
+
+  // Максимальные размеры (избегаем огромные изображения)
+  if (width > 8000 || height > 8000) {
+    return { valid: false, reason: 'Изображение слишком большое (максимум 8000x8000px)' };
+  }
+
+  // Проверяем соотношение сторон (избегаем подозрительно узкие изображения)
+  const aspectRatio = Math.max(width, height) / Math.min(width, height);
+  if (aspectRatio > 10) {
+    return { valid: false, reason: 'Неподходящее соотношение сторон' };
+  }
+
+  return { valid: true };
+};
 
 export default function ImageUploader({
   maxFiles = 10,
@@ -36,6 +122,7 @@ export default function ImageUploader({
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [securityWarnings, setSecurityWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Утилиты для работы с изображениями
@@ -62,7 +149,7 @@ export default function ImageUploader({
         canvas.width = width;
         canvas.height = height;
         
-        // Рисуем сжатое изображение
+        // Очищаем canvas белым фоном (безопасность)
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
@@ -101,9 +188,9 @@ export default function ImageUploader({
     });
   };
 
-  // ✅ ИСПРАВЛЕНО: Расширенная обработка файлов с отладкой
+  // Расширенная обработка файлов с улучшенной безопасностью
   const processFiles = useCallback(async (files: FileList | File[]) => {
-    console.log('📁 Начинаем обработку файлов:', {
+    console.log('📁 Начинаем безопасную обработку файлов:', {
       filesCount: files.length,
       currentImagesCount: images.length,
       maxFiles,
@@ -112,9 +199,11 @@ export default function ImageUploader({
 
     setIsProcessing(true);
     setError(null);
+    setSecurityWarnings([]);
     
     const fileArray = Array.from(files);
     const newProcessedImages: ProcessedImage[] = [];
+    const warnings: string[] = [];
     
     // Проверяем лимиты
     if (images.length + fileArray.length > maxFiles) {
@@ -129,13 +218,19 @@ export default function ImageUploader({
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
         
-        console.log(`📸 Обрабатываем файл ${i + 1}/${fileArray.length}:`, {
+        console.log(`📸 Безопасная обработка файла ${i + 1}/${fileArray.length}:`, {
           name: file.name,
           type: file.type,
           size: file.size
         });
         
-        // Валидация формата
+        // 1. Проверка имени файла на подозрительное содержимое
+        if (!checkForSuspiciousContent(file)) {
+          warnings.push(`Файл ${file.name} имеет подозрительное расширение`);
+          continue;
+        }
+
+        // 2. Валидация MIME типа
         if (!acceptedFormats.includes(file.type)) {
           const errorMsg = `Формат ${file.type} не поддерживается. Поддерживаемые: ${acceptedFormats.join(', ')}`;
           console.warn('⚠️ Неподдерживаемый формат:', errorMsg);
@@ -143,20 +238,34 @@ export default function ImageUploader({
           continue;
         }
         
-        // Валидация размера
+        // 3. Валидация размера файла
         if (file.size > maxSizeBytes) {
           const errorMsg = `Файл ${file.name} слишком большой (${Math.round(file.size / (1024 * 1024))}MB). Максимум: ${Math.round(maxSizeBytes / (1024 * 1024))}MB`;
           console.warn('⚠️ Файл слишком большой:', errorMsg);
           setError(errorMsg);
           continue;
         }
+
+        // 4. Проверка magic bytes (реальное содержимое файла)
+        const isValidImage = await validateImageFile(file);
+        if (!isValidImage) {
+          warnings.push(`Файл ${file.name} не является корректным изображением`);
+          continue;
+        }
         
         try {
-          // Получаем размеры изображения
+          // 5. Получаем размеры изображения
           const dimensions = await getImageDimensions(file);
           console.log('📐 Размеры изображения:', dimensions);
           
-          // Определяем нужно ли сжимать
+          // 6. Валидация размеров
+          const dimensionCheck = validateImageDimensions(dimensions.width, dimensions.height);
+          if (!dimensionCheck.valid) {
+            warnings.push(`${file.name}: ${dimensionCheck.reason}`);
+            continue;
+          }
+
+          // 7. Определяем нужно ли сжимать
           const needsCompression = file.size > 1024 * 1024 || dimensions.width > 1200; // Сжимаем если больше 1MB или ширина > 1200px
           
           let finalBlob: Blob = file;
@@ -164,7 +273,7 @@ export default function ImageUploader({
           let compressed = false;
           
           if (needsCompression) {
-            console.log('🗜️ Сжимаем изображение...');
+            console.log('🗜️ Безопасное сжатие изображения...');
             const result = await compressImage(file);
             finalBlob = result.blob;
             base64 = result.base64;
@@ -192,21 +301,28 @@ export default function ImageUploader({
             compressed,
             originalSize: file.size,
             compressedSize: finalBlob.size,
-            dimensions
+            dimensions,
+            isSecure: true, // Отмечаем как безопасное после всех проверок
           };
           
           newProcessedImages.push(processedImage);
-          console.log('✅ Файл успешно обработан:', {
+          console.log('✅ Файл безопасно обработан:', {
             id: processedImage.id,
             name: file.name,
             originalSize: file.size,
-            finalSize: finalBlob.size
+            finalSize: finalBlob.size,
+            isSecure: processedImage.isSecure
           });
           
         } catch (fileError) {
           console.error('❌ Ошибка обработки файла:', file.name, fileError);
-          setError(`Ошибка обработки файла ${file.name}: ${fileError instanceof Error ? fileError.message : 'Неизвестная ошибка'}`);
+          warnings.push(`Ошибка обработки файла ${file.name}: ${fileError instanceof Error ? fileError.message : 'Неизвестная ошибка'}`);
         }
+      }
+      
+      // Устанавливаем предупреждения безопасности
+      if (warnings.length > 0) {
+        setSecurityWarnings(warnings);
       }
       
       if (newProcessedImages.length > 0) {
@@ -214,16 +330,19 @@ export default function ImageUploader({
         console.log('🔄 Обновляем состояние изображений:', {
           oldCount: images.length,
           newCount: newProcessedImages.length,
-          totalCount: updatedImages.length
+          totalCount: updatedImages.length,
+          secureImages: newProcessedImages.filter(img => img.isSecure).length
         });
         
         setImages(updatedImages);
         onImagesChange(updatedImages);
         
-        console.log('✅ Все файлы обработаны успешно');
+        console.log('✅ Все файлы безопасно обработаны');
       } else {
         console.warn('⚠️ Ни один файл не был обработан');
-        setError(prevError => prevError || 'Ни один файл не был добавлен. Проверьте формат и размер файлов.');
+        if (!error && warnings.length === 0) {
+          setError('Ни один файл не был добавлен. Проверьте формат и размер файлов.');
+        }
       }
       
     } catch (err) {
@@ -233,7 +352,7 @@ export default function ImageUploader({
     } finally {
       setIsProcessing(false);
     }
-  }, [images, maxFiles, maxSizeBytes, acceptedFormats, onImagesChange]);
+  }, [images, maxFiles, maxSizeBytes, acceptedFormats, onImagesChange, error]);
 
   // Удаление изображения
   const removeImage = (id: string) => {
@@ -279,7 +398,7 @@ export default function ImageUploader({
     if (disabled) return;
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      console.log('📂 Файлы перетащены:', e.dataTransfer.files.length);
+      console.log('📂 Файлы перетащены для безопасной обработки:', e.dataTransfer.files.length);
       processFiles(e.dataTransfer.files);
     }
   }, [disabled, processFiles]);
@@ -287,7 +406,7 @@ export default function ImageUploader({
   // File input handler
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      console.log('📂 Файлы выбраны через диалог:', e.target.files.length);
+      console.log('📂 Файлы выбраны для безопасной обработки:', e.target.files.length);
       processFiles(e.target.files);
     }
   };
@@ -329,7 +448,7 @@ export default function ImageUploader({
         {isProcessing ? (
           <div className="flex items-center justify-center">
             <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mr-2"></div>
-            <span className="text-gray-600">Обрабатываем изображения...</span>
+            <span className="text-gray-600">Безопасная обработка изображений...</span>
           </div>
         ) : (
           <>
@@ -345,11 +464,40 @@ export default function ImageUploader({
               До {maxFiles} файлов, максимум {formatFileSize(maxSizeBytes)} каждый
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              Поддерживаемые форматы: JPEG, PNG, WebP
+              Поддерживаемые форматы: JPEG, PNG, WebP • Безопасная проверка содержимого
             </p>
+            
+            {/* Индикатор безопасности */}
+            <div className="flex items-center justify-center mt-2 text-xs text-green-600">
+              <Shield className="w-3 h-3 mr-1" />
+              <span>Автоматическая проверка безопасности</span>
+            </div>
           </>
         )}
       </div>
+
+      {/* Security Warnings */}
+      {securityWarnings.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+          <div className="flex items-start space-x-2">
+            <AlertCircle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-orange-800">Предупреждения безопасности:</h4>
+              <ul className="text-xs text-orange-700 mt-1 space-y-1">
+                {securityWarnings.map((warning, index) => (
+                  <li key={index}>• {warning}</li>
+                ))}
+              </ul>
+            </div>
+            <button
+              onClick={() => setSecurityWarnings([])}
+              className="text-orange-400 hover:text-orange-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
@@ -385,6 +533,15 @@ export default function ImageUploader({
                 
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200" />
+                
+                {/* Security Badge */}
+                {image.isSecure && (
+                  <div className="absolute top-2 left-2">
+                    <div className="bg-green-500 text-white p-1 rounded-full" title="Безопасно проверено">
+                      <Shield className="w-3 h-3" />
+                    </div>
+                  </div>
+                )}
                 
                 {/* Controls */}
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -430,8 +587,8 @@ export default function ImageUploader({
 
                 {/* Compression Badge */}
                 {image.compressed && (
-                  <div className="absolute top-2 left-2">
-                    <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                  <div className="absolute bottom-2 right-2">
+                    <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
                       Сжато
                     </span>
                   </div>
@@ -443,7 +600,7 @@ export default function ImageUploader({
                 <div className="truncate mb-1" title={image.file.name}>
                   {image.file.name}
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-1">
                   <span>{image.dimensions.width}×{image.dimensions.height}</span>
                   <span>
                     {image.compressed 
@@ -451,6 +608,10 @@ export default function ImageUploader({
                       : formatFileSize(image.originalSize)
                     }
                   </span>
+                </div>
+                <div className="flex items-center text-green-600">
+                  <Shield className="w-3 h-3 mr-1" />
+                  <span>Проверено</span>
                 </div>
               </div>
             </div>
@@ -461,7 +622,7 @@ export default function ImageUploader({
       {/* Summary */}
       {images.length > 0 && (
         <div className="bg-gray-50 rounded-lg p-4">
-          <div className="flex justify-between items-center text-sm text-gray-600">
+          <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
             <span>
               Загружено: {images.length} из {maxFiles} изображений
             </span>
@@ -469,11 +630,20 @@ export default function ImageUploader({
               Общий размер: {formatFileSize(images.reduce((sum, img) => sum + img.compressedSize, 0))}
             </span>
           </div>
-          {images.some(img => img.compressed) && (
-            <p className="text-xs text-green-600 mt-2">
-              ✓ Некоторые изображения были автоматически сжаты для лучшей производительности
-            </p>
-          )}
+          
+          <div className="flex items-center justify-between text-xs">
+            <div>
+              {images.some(img => img.compressed) && (
+                <span className="text-blue-600">
+                  ✓ Некоторые изображения автоматически сжаты
+                </span>
+              )}
+            </div>
+            <div className="flex items-center text-green-600">
+              <Shield className="w-3 h-3 mr-1" />
+              <span>Все изображения проверены на безопасность</span>
+            </div>
+          </div>
         </div>
       )}
     </div>

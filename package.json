@@ -1,12 +1,76 @@
 {
-  "name": "velora",
-  "version": "0.1.0",
+  "name": "velorabook",
+  "version": "0.2.0",
   "private": true,
+  "description": "AI-powered personalized books platform",
+  "keywords": [
+    "nextjs",
+    "ai",
+    "books",
+    "personalization",
+    "openai",
+    "typescript"
+  ],
+  "author": {
+    "name": "VeloraBook Team",
+    "email": "team@velorabook.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/velorabook.git"
+  },
+  "engines": {
+    "node": ">=18.17.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{js,ts,jsx,tsx,json,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{js,ts,jsx,tsx,json,css,md}\"",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:reset": "prisma migrate reset",
+    "db:migrate:prod": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset --force && npm run db:seed",
+    "test:all": "tsx scripts/test-all.ts",
+    "test:env": "tsx scripts/test-env.ts",
+    "test:db": "tsx scripts/test-db.ts",
+    "test:redis": "tsx scripts/test-redis.ts",
+    "test:api": "tsx scripts/test-api.ts",
+    "test:security": "tsx scripts/test-security.ts",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:clean": "docker-compose down -v --remove-orphans",
+    "build:analyze": "ANALYZE=true npm run build",
+    "build:production": "NODE_ENV=production npm run build",
+    "build:docker": "docker build -t velorabook .",
+    "prepare": "husky install",
+    "precommit": "lint-staged",
+    "prepush": "npm run type-check && npm run lint",
+    "clean": "rm -rf .next out dist",
+    "clean:all": "npm run clean && rm -rf node_modules package-lock.json",
+    "reinstall": "npm run clean:all && npm install",
+    "security:audit": "npm audit --audit-level moderate",
+    "security:fix": "npm audit fix",
+    "security:check": "tsx scripts/security-check.ts",
+    "performance:analyze": "tsx scripts/performance-check.ts",
+    "performance:lighthouse": "lighthouse http://localhost:3000 --output html --output-path ./reports/lighthouse.html",
+    "deploy:vercel": "vercel --prod",
+    "deploy:docker": "docker-compose -f docker-compose.prod.yml up -d",
+    "logs:error": "tail -f logs/error.log",
+    "logs:access": "tail -f logs/access.log",
+    "backup:db": "tsx scripts/backup-db.ts",
+    "restore:db": "tsx scripts/restore-db.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.9.1",
@@ -16,7 +80,6 @@
     "@upstash/ratelimit": "^2.0.5",
     "@upstash/redis": "^1.34.9",
     "bcryptjs": "^2.4.3",
-    "dotenv": "^16.5.0",
     "ioredis": "^5.6.1",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.511.0",
@@ -25,21 +88,31 @@
     "openai": "^4.103.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "redis": "^5.1.1",
     "sharp": "^0.34.2",
     "zod": "^3.25.42"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@next/bundle-analyzer": "^15.3.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
     "autoprefixer": "^10.4.16",
-    "eslint": "^9",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.5.0",
+    "eslint": "^8.57.1",
     "eslint-config-next": "15.3.2",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-security": "^2.1.0",
+    "husky": "^9.0.0",
+    "lighthouse": "^11.0.0",
+    "lint-staged": "^15.2.0",
     "postcss": "^8.4.32",
+    "prettier": "^3.2.0",
     "prisma": "^6.8.2",
     "tailwindcss": "^3.4.0",
     "tsx": "^4.19.4",
@@ -47,5 +120,32 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "lint-staged": {
+    "*.{js,ts,jsx,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-push": "npm run type-check"
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.3%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }
