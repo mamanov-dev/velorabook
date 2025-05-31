@@ -1,0 +1,8 @@
+HTTP/1.1 400 Bad Request
+content-type: application/json
+Date: Sat, 31 May 2025 09:57:42 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+{"error":"No number after minus sign in JSON at position 1 (line 1 column 2)"}
