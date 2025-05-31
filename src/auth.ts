@@ -1,8 +1,13 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import Google from 'next-auth/providers/google'
+import { PrismaAdapter } from '@auth/prisma-adapter'
+import bcrypt from 'bcryptjs'
+import { prisma } from '@/lib/prisma'
+import { UserLoginSchema } from '@/lib/validation'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  adapter: PrismaAdapter(prisma),
   session: {
     strategy: 'jwt'
   },
@@ -21,20 +26,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         try {
-          // Временная заглушка - только демо пользователь
-          if (credentials?.email === 'demo@velorabook.com' && 
-              credentials?.password === 'demo123') {
-            return {
-              id: 'demo-user-id',
-              email: 'demo@velorabook.com',
-              name: 'Demo User',
-              image: undefined,
-            }
+          const validatedFields = UserLoginSchema.safeParse(credentials)
+          if (!validatedFields.success) return null
+
+          const { email, password } = validatedFields.data
+
+          const user = await prisma.user.findUnique({
+            where: { email: email.toLowerCase() },
+          })
+
+          if (!user || !user.password) return null
+
+          const isValid = await bcrypt.compare(password, user.password)
+          if (!isValid) return null
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image ?? undefined,
           }
-          
-          return null
         } catch (error) {
-          console.error('❌ Auth error:', error)
+          console.error('Auth error:', error)
           return null
         }
       }
@@ -54,7 +67,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.name = user.name
         token.image = user.image
       }
-      
       return token
     },
     
@@ -65,18 +77,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.name = token.name as string
         session.user.image = token.image as string | undefined
       }
-      
       return session
     },
   },
 
-  debug: process.env.NODE_ENV === 'development',
   secret: process.env.NEXTAUTH_SECRET,
 })
 
-// Временная заглушка для userService
 export const userService = {
-  async createUser() {
-    throw new Error('Регистрация временно недоступна')
+  async createUser(userData: { name: string; email: string; password: string }) {
+    const existingUser = await prisma.user.findUnique({
+      where: { email: userData.email.toLowerCase() }
+    })
+
+    if (existingUser) {
+      throw new Error('Пользователь с таким email уже существует')
+    }
+
+    const hashedPassword = await bcrypt.hash(userData.password, 12)
+
+    return await prisma.user.create({
+      data: {
+        name: userData.name,
+        email: userData.email.toLowerCase(),
+        password: hashedPassword,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+      }
+    })
   }
 }
