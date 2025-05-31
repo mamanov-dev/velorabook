@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    
     // Временная заглушка для регистрации
     return NextResponse.json({
       success: false,
