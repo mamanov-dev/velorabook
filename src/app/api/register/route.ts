@@ -1,31 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { userService } from '@/auth'
-import { validateWithSchema, UserRegistrationSchema } from '@/lib/validation'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    // Валидируем данные
-    const validatedData = validateWithSchema(UserRegistrationSchema, body)
+    // Временная заглушка для регистрации
+    return NextResponse.json({
+      success: false,
+      error: 'Регистрация временно недоступна. Ведется настройка продакшн окружения.',
+      message: 'Используйте демо-аккаунт: demo@velorabook.com / demo123'
+    }, { status: 503 })
     
-    // Создаем пользователя
-    const user = await userService.createUser(validatedData)
-
-    return NextResponse.json(
-      { 
-        success: true, 
-        message: 'Пользователь успешно зарегистрирован',
-        user
-      },
-      { status: 201 }
-    )
-  } catch (error) {
-    console.error('Ошибка регистрации:', error)
-    
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Внутренняя ошибка сервера' },
-      { status: 400 }
-    )
+  } catch {
+    return NextResponse.json({
+      error: 'Ошибка обработки запроса'
+    }, { status: 400 })
   }
 }
