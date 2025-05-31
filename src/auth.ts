@@ -8,6 +8,9 @@ import { UserLoginSchema } from '@/lib/validation'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
+  session: {
+    strategy: 'jwt' // ВАЖНО: явно указываем JWT стратегию
+  },
   
   providers: [
     Google({
@@ -23,8 +26,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         try {
+          console.log('🔍 Auth attempt for:', credentials?.email)
+          
           const validatedFields = UserLoginSchema.safeParse(credentials)
-          if (!validatedFields.success) return null
+          if (!validatedFields.success) {
+            console.log('❌ Validation failed')
+            return null
+          }
 
           const { email, password } = validatedFields.data
 
@@ -32,10 +40,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             where: { email: email.toLowerCase() },
           })
 
-          if (!user || !user.password) return null
+          console.log('👤 User found:', !!user)
+
+          if (!user || !user.password) {
+            console.log('❌ No user or password')
+            return null
+          }
 
           const isValid = await bcrypt.compare(password, user.password)
-          if (!isValid) return null
+          console.log('🔐 Password valid:', isValid)
+          
+          if (!isValid) {
+            console.log('❌ Invalid password')
+            return null
+          }
+
+          console.log('✅ Auth successful for:', user.email)
 
           return {
             id: user.id,
@@ -44,7 +64,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             image: user.image,
           }
         } catch (error) {
-          console.error('Auth error:', error)
+          console.error('❌ Auth error:', error)
           return null
         }
       }
@@ -57,18 +77,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 
   callbacks: {
-    async jwt({ user, token }) {
-      if (user) token.id = user.id
+    async jwt({ user, token, trigger }) {
+      console.log('JWT callback:', { user: !!user, token: !!token, trigger })
+      
+      if (user) {
+        token.id = user.id
+        token.email = user.email
+        token.name = user.name
+        token.image = user.image
+      }
+      
       return token
     },
+    
     async session({ session, token }) {
+      console.log('Session callback:', { session: !!session, token: !!token })
+      
       if (token && session.user) {
         session.user.id = token.id as string
+        session.user.email = token.email as string
+        session.user.name = token.name as string
+        session.user.image = token.image as string | undefined
       }
+      
+      console.log('Final session:', session)
       return session
     },
   },
 
+  debug: process.env.NODE_ENV === 'development', // Включаем отладку
   secret: process.env.NEXTAUTH_SECRET,
 })
 
