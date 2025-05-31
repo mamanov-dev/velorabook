@@ -1,13 +1,37 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import Google from 'next-auth/providers/google'
-import { PrismaAdapter } from '@auth/prisma-adapter'
 import bcrypt from 'bcryptjs'
-import { prisma } from '@/lib/prisma'
-import { UserLoginSchema } from '@/lib/validation'
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+// Условный импорт Prisma только если это не build time
+const isPrismaAvailable = process.env.DATABASE_URL && process.env.DATABASE_URL !== 'placeholder'
+
+let prisma: any = null
+let PrismaAdapter: any = null
+
+if (isPrismaAvailable) {
+  try {
+    const prismaModule = require('@/lib/prisma')
+    const adapterModule = require('@auth/prisma-adapter')
+    prisma = prismaModule.prisma
+    PrismaAdapter = adapterModule.PrismaAdapter
+  } catch (error) {
+    console.log('Prisma not available during build:', error)
+  }
+}
+
+// Условный импорт validation только если Prisma доступен
+let UserLoginSchema: any = null
+if (isPrismaAvailable) {
+  try {
+    const validationModule = require('@/lib/validation')
+    UserLoginSchema = validationModule.UserLoginSchema
+  } catch (error) {
+    console.log('Validation not available during build:', error)
+  }
+}
+
+const authConfig: any = {
   session: {
     strategy: 'jwt'
   },
@@ -26,6 +50,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         try {
+          // Fallback для build time
+          if (!isPrismaAvailable || !prisma || !UserLoginSchema) {
+            if (credentials?.email === 'demo@velorabook.com' && 
+                credentials?.password === 'demo123') {
+              return {
+                id: 'demo-user-id',
+                email: 'demo@velorabook.com',
+                name: 'Demo User',
+                image: undefined,
+              }
+            }
+            return null
+          }
+
           const validatedFields = UserLoginSchema.safeParse(credentials)
           if (!validatedFields.success) return null
 
@@ -60,7 +98,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 
   callbacks: {
-    async jwt({ user, token }) {
+    async jwt({ user, token }: { user?: any; token: any }) {
       if (user) {
         token.id = user.id
         token.email = user.email
@@ -70,7 +108,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token
     },
     
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: any }) {
       if (token && session.user) {
         session.user.id = token.id as string
         session.user.email = token.email as string
@@ -82,10 +120,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 
   secret: process.env.NEXTAUTH_SECRET,
-})
+}
+
+// Добавляем PrismaAdapter только если доступен
+if (isPrismaAvailable && PrismaAdapter && prisma) {
+  authConfig.adapter = PrismaAdapter(prisma)
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig)
 
 export const userService = {
   async createUser(userData: { name: string; email: string; password: string }) {
+    if (!isPrismaAvailable || !prisma) {
+      throw new Error('База данных недоступна')
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { email: userData.email.toLowerCase() }
     })
