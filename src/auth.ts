@@ -3,35 +3,12 @@ import Credentials from 'next-auth/providers/credentials'
 import Google from 'next-auth/providers/google'
 import bcrypt from 'bcryptjs'
 
-// Условный импорт Prisma только если это не build time
-const isPrismaAvailable = process.env.DATABASE_URL && process.env.DATABASE_URL !== 'placeholder'
+// Проверка доступности базы данных
+const isDatabaseAvailable = process.env.DATABASE_URL && 
+  process.env.DATABASE_URL !== 'placeholder' && 
+  !process.env.DATABASE_URL.includes('placeholder')
 
-let prisma: any = null
-let PrismaAdapter: any = null
-
-if (isPrismaAvailable) {
-  try {
-    const prismaModule = require('@/lib/prisma')
-    const adapterModule = require('@auth/prisma-adapter')
-    prisma = prismaModule.prisma
-    PrismaAdapter = adapterModule.PrismaAdapter
-  } catch (error) {
-    console.log('Prisma not available during build:', error)
-  }
-}
-
-// Условный импорт validation только если Prisma доступен
-let UserLoginSchema: any = null
-if (isPrismaAvailable) {
-  try {
-    const validationModule = require('@/lib/validation')
-    UserLoginSchema = validationModule.UserLoginSchema
-  } catch (error) {
-    console.log('Validation not available during build:', error)
-  }
-}
-
-const authConfig: any = {
+export const { handlers, auth, signIn, signOut } = NextAuth({
   session: {
     strategy: 'jwt'
   },
@@ -50,19 +27,25 @@ const authConfig: any = {
       },
       async authorize(credentials) {
         try {
-          // Fallback для build time
-          if (!isPrismaAvailable || !prisma || !UserLoginSchema) {
-            if (credentials?.email === 'demo@velorabook.com' && 
-                credentials?.password === 'demo123') {
-              return {
-                id: 'demo-user-id',
-                email: 'demo@velorabook.com',
-                name: 'Demo User',
-                image: undefined,
-              }
+          // Демо пользователь для build time и fallback
+          if (credentials?.email === 'demo@velorabook.com' && 
+              credentials?.password === 'demo123') {
+            return {
+              id: 'demo-user-id',
+              email: 'demo@velorabook.com',
+              name: 'Demo User',
+              image: undefined,
             }
+          }
+
+          // Если база недоступна, только демо пользователь
+          if (!isDatabaseAvailable) {
             return null
           }
+
+          // Динамический импорт для продакшена
+          const { prisma } = await import('@/lib/prisma')
+          const { UserLoginSchema } = await import('@/lib/validation')
 
           const validatedFields = UserLoginSchema.safeParse(credentials)
           if (!validatedFields.success) return null
@@ -98,7 +81,7 @@ const authConfig: any = {
   },
 
   callbacks: {
-    async jwt({ user, token }: { user?: any; token: any }) {
+    async jwt({ user, token }) {
       if (user) {
         token.id = user.id
         token.email = user.email
@@ -108,7 +91,7 @@ const authConfig: any = {
       return token
     },
     
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
         session.user.email = token.email as string
@@ -120,43 +103,45 @@ const authConfig: any = {
   },
 
   secret: process.env.NEXTAUTH_SECRET,
-}
-
-// Добавляем PrismaAdapter только если доступен
-if (isPrismaAvailable && PrismaAdapter && prisma) {
-  authConfig.adapter = PrismaAdapter(prisma)
-}
-
-export const { handlers, auth, signIn, signOut } = NextAuth(authConfig)
+})
 
 export const userService = {
   async createUser(userData: { name: string; email: string; password: string }) {
-    if (!isPrismaAvailable || !prisma) {
-      throw new Error('База данных недоступна')
+    if (!isDatabaseAvailable) {
+      throw new Error('Регистрация временно недоступна')
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: userData.email.toLowerCase() }
-    })
+    try {
+      const { prisma } = await import('@/lib/prisma')
+      
+      const existingUser = await prisma.user.findUnique({
+        where: { email: userData.email.toLowerCase() }
+      })
 
-    if (existingUser) {
-      throw new Error('Пользователь с таким email уже существует')
-    }
-
-    const hashedPassword = await bcrypt.hash(userData.password, 12)
-
-    return await prisma.user.create({
-      data: {
-        name: userData.name,
-        email: userData.email.toLowerCase(),
-        password: hashedPassword,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
+      if (existingUser) {
+        throw new Error('Пользователь с таким email уже существует')
       }
-    })
+
+      const hashedPassword = await bcrypt.hash(userData.password, 12)
+
+      return await prisma.user.create({
+        data: {
+          name: userData.name,
+          email: userData.email.toLowerCase(),
+          password: hashedPassword,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          createdAt: true,
+        }
+      })
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error
+      }
+      throw new Error('Ошибка создания пользователя')
+    }
   }
 }
