@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Временно отключаем API для успешной сборки
-export async function POST(request: NextRequest) {
+export async function POST() {
   return NextResponse.json({
     success: false,
     error: 'API генерации книг временно недоступен. Ведется настройка продакшн окружения.',
