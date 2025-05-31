@@ -1,13 +1,8 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import Google from 'next-auth/providers/google'
-import { PrismaAdapter } from '@auth/prisma-adapter'
-import bcrypt from 'bcryptjs'
-import { prisma } from '@/lib/prisma'
-import { UserLoginSchema } from '@/lib/validation'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
   session: {
     strategy: 'jwt'
   },
@@ -26,43 +21,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         try {
-          console.log('🔍 Auth attempt for:', credentials?.email)
+          // Временная заглушка - только демо пользователь
+          if (credentials?.email === 'demo@velorabook.com' && 
+              credentials?.password === 'demo123') {
+            return {
+              id: 'demo-user-id',
+              email: 'demo@velorabook.com',
+              name: 'Demo User',
+              image: undefined,
+            }
+          }
           
-          const validatedFields = UserLoginSchema.safeParse(credentials)
-          if (!validatedFields.success) {
-            console.log('❌ Validation failed')
-            return null
-          }
-
-          const { email, password } = validatedFields.data
-
-          const user = await prisma.user.findUnique({
-            where: { email: email.toLowerCase() },
-          })
-
-          console.log('👤 User found:', !!user)
-
-          if (!user || !user.password) {
-            console.log('❌ No user or password')
-            return null
-          }
-
-          const isValid = await bcrypt.compare(password, user.password)
-          console.log('🔐 Password valid:', isValid)
-          
-          if (!isValid) {
-            console.log('❌ Invalid password')
-            return null
-          }
-
-          console.log('✅ Auth successful for:', user.email)
-
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            image: user.image ?? undefined, // Конвертируем null в undefined
-          }
+          return null
         } catch (error) {
           console.error('❌ Auth error:', error)
           return null
@@ -78,8 +48,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   callbacks: {
     async jwt({ user, token, trigger }) {
-      console.log('JWT callback:', { user: !!user, token: !!token, trigger })
-      
       if (user) {
         token.id = user.id
         token.email = user.email
@@ -91,8 +59,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     
     async session({ session, token }) {
-      console.log('Session callback:', { session: !!session, token: !!token })
-      
       if (token && session.user) {
         session.user.id = token.id as string
         session.user.email = token.email as string
@@ -100,7 +66,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.image = token.image as string | undefined
       }
       
-      console.log('Final session:', session)
       return session
     },
   },
@@ -109,31 +74,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET,
 })
 
-// Сервис для работы с пользователями
+// Временная заглушка для userService
 export const userService = {
-  async createUser(userData: { name: string; email: string; password: string }) {
-    const existingUser = await prisma.user.findUnique({
-      where: { email: userData.email.toLowerCase() }
-    })
-
-    if (existingUser) {
-      throw new Error('Пользователь с таким email уже существует')
-    }
-
-    const hashedPassword = await bcrypt.hash(userData.password, 12)
-
-    return await prisma.user.create({
-      data: {
-        name: userData.name,
-        email: userData.email.toLowerCase(),
-        password: hashedPassword,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-      }
-    })
+  async createUser() {
+    throw new Error('Регистрация временно недоступна')
   }
 }
