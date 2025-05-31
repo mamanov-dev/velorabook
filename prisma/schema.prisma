@@ -1,0 +1,194 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  image         String?
+  password      String?   // для credentials provider
+  emailVerified DateTime?
+  isVerified    Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationships
+  accounts Account[]
+  sessions Session[]
+  books    Book[]
+  images   BookImage[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Book {
+  id                String   @id @default(cuid())
+  title             String
+  bookType          String   // romantic, family, friendship, child, travel
+  status            BookStatus @default(DRAFT)
+  content           Json     // полное содержание книги
+  metadata          Json?    // метаданные (word count, generated at, etc.)
+  answers           Json     // ответы пользователя на вопросы
+  
+  // Book details
+  totalChapters     Int
+  estimatedReadTime Int
+  author            String?
+  dedicatedTo       String?
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  publishedAt       DateTime?
+  
+  // Relationships
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images            BookImage[]
+  chapters          BookChapter[]
+
+  @@map("books")
+}
+
+model BookChapter {
+  id        String  @id @default(cuid())
+  bookId    String
+  number    Int
+  title     String
+  content   String  @db.Text
+  epigraph  String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  book      Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  
+  @@unique([bookId, number])
+  @@map("book_chapters")
+}
+
+model BookImage {
+  id              String   @id @default(cuid())
+  bookId          String?
+  userId          String
+  
+  // File info
+  originalName    String
+  fileName        String   // уникальное имя файла
+  fileSize        Int
+  mimeType        String
+  
+  // Image info
+  width           Int
+  height          Int
+  
+  // Storage info
+  storageUrl      String   // URL в Cloudflare R2
+  thumbnailUrl    String?  // URL миниатюры
+  
+  // Metadata
+  caption         String?
+  description     String?
+  alt             String?
+  
+  // Processing
+  isProcessed     Boolean  @default(false)
+  compressed      Boolean  @default(false)
+  originalSize    Int?
+  compressedSize  Int?
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relationships
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book            Book?    @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  
+  @@map("book_images")
+}
+
+model ApiUsage {
+  id            String   @id @default(cuid())
+  userId        String?
+  endpoint      String   // /api/generate-book, /api/upload-image
+  method        String   // POST, GET
+  statusCode    Int
+  
+  // Request info
+  requestSize   Int?     // bytes
+  responseSize  Int?     // bytes
+  duration      Int      // milliseconds
+  
+  // OpenAI specific
+  tokensUsed    Int?
+  model         String?
+  cost          Decimal? @db.Decimal(10, 4)
+  
+  // Error info
+  errorMessage  String?
+  
+  createdAt     DateTime @default(now())
+  
+  @@map("api_usage")
+}
+
+enum BookStatus {
+  DRAFT
+  GENERATING
+  COMPLETED
+  FAILED
+  PUBLISHED
+}
+
+// Indexes for performance
+// @@index([userId, createdAt], map: "books_user_created_idx")
+// @@index([bookType, status], map: "books_type_status_idx")
