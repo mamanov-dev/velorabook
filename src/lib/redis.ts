@@ -6,8 +6,8 @@ import { Redis as UpstashRedis } from '@upstash/redis';
 const localRedis = new Redis({
   host: process.env.REDIS_HOST || 'localhost',
   port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD,
-  retryDelayOnFailover: 100,
+  password: process.env.REDIS_PASSWORD || undefined,
+  lazyConnect: true,
   maxRetriesPerRequest: 3,
 });
 
@@ -24,7 +24,7 @@ export const redis = process.env.NODE_ENV === 'production' && upstashRedis
   : localRedis;
 
 export class CacheService {
-  static async set(key: string, value: any, ttl = 3600): Promise<void> {
+  static async set(key: string, value: unknown, ttl = 3600): Promise<void> {
     try {
       const data = JSON.stringify(value);
       if (redis instanceof Redis) {
@@ -37,7 +37,7 @@ export class CacheService {
     }
   }
 
-  static async get(key: string): Promise<any | null> {
+  static async get(key: string): Promise<unknown | null> {
     try {
       const cached = await redis.get(key);
       return cached ? JSON.parse(cached as string) : null;

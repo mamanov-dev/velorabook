@@ -19,7 +19,7 @@ export async function GET() {
     }, { 
       status: status === 'healthy' ? 200 : 503 
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       status: 'unhealthy',
       error: 'Health check failed'

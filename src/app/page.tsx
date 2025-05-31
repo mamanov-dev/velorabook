@@ -3,6 +3,7 @@
 import { useSession, signOut } from 'next-auth/react'
 import { Sparkles, Star, Clock, Globe, Heart, Users, BookOpen, ArrowRight, User, LogOut, Settings } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function Home() {
   const { data: session, status } = useSession()
@@ -33,9 +34,11 @@ export default function Home() {
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
                   {session.user?.image ? (
-                    <img 
+                    <Image 
                       src={session.user.image} 
                       alt={session.user.name || 'Аватар'}
+                      width={32}
+                      height={32}
                       className="w-8 h-8 rounded-full"
                     />
                   ) : (
