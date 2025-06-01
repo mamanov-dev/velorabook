@@ -2,7 +2,7 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import Google from 'next-auth/providers/google'
 import bcrypt from 'bcryptjs'
-import { env, serviceAvailability } from '@/lib/env'
+import { env, serviceAvailability } from '@/lib/env-safe'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: {
@@ -189,4 +189,5 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 })
+// Экспортируем userService отдельно
 export { userService } from '@/services/user'

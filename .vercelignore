@@ -1,0 +1,42 @@
+# Development files
+.env.local
+.env.development
+.env.test
+
+# Test files
+test-*.ts
+test-*.js
+scripts/test-*.ts
+*.test.ts
+*.spec.ts
+
+# Docker files
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# Database files
+prisma/migrations/
+prisma/seed.ts
+
+# IDE files
+.vscode/
+.idea/
+
+# Documentation
+README.md
+docs/
+
+# Git files
+.git/
+.gitignore
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+
+# Cache
+.next/cache/

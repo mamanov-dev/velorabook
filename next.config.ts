@@ -1,13 +1,12 @@
 import type { NextConfig } from "next";
 import { env } from './src/lib/env';
+const path = require('path');
 
-// Bundle analyzer для анализа размера сборки
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
 
 const nextConfig: NextConfig = {
-  // Базовые настройки
   reactStrictMode: true,
   poweredByHeader: false,
 
@@ -32,7 +31,6 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // ⬇️ перемещено сюда из experimental
   serverExternalPackages: [
     '@prisma/client',
     'bcryptjs',
@@ -112,12 +110,14 @@ const nextConfig: NextConfig = {
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@': './src',
-      '@/components': './src/components',
-      '@/lib': './src/lib',
-      '@/hooks': './src/hooks',
-      '@/contexts': './src/contexts',
-      '@/types': './src/types',
+      '@': path.resolve(__dirname, './src'),
+      '@/components': path.resolve(__dirname, './src/components'),
+      '@/lib': path.resolve(__dirname, './src/lib'),
+      '@/hooks': path.resolve(__dirname, './src/hooks'),
+      '@/contexts': path.resolve(__dirname, './src/contexts'),
+      '@/types': path.resolve(__dirname, './src/types'),
+      '@/auth': path.resolve(__dirname, './src/auth'),
+      '@/services': path.resolve(__dirname, './src/services'),
     };
 
     if (!isServer) {
@@ -197,9 +197,7 @@ const nextConfig: NextConfig = {
     pagesBufferLength: 2,
   },
 
-  ...(process.env.ANALYZE === 'true' && {
-    // Можно вставить анализатор сборки тут при необходимости
-  }),
+  ...(process.env.ANALYZE === 'true' && {}),
 };
 
 module.exports = withBundleAnalyzer(nextConfig);

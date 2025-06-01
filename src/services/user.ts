@@ -1,6 +1,6 @@
 // src/services/user.ts
 import bcrypt from 'bcryptjs'
-import { serviceAvailability } from '@/lib/env'
+import { serviceAvailability } from '@/lib/env-safe'
 
 export const userService = {
   async createUser(userData: { name: string; email: string; password: string }) {
