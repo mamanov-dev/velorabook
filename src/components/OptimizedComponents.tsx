@@ -196,7 +196,7 @@ export const VirtualList = memo(({
       start: Math.max(0, start - overscan),
       end: Math.min(items.length, (end === -1 ? items.length : end) + overscan)
     }
-  }, [scrollTop, containerHeight, itemPositions, items.length, overscan])
+  }, [scrollTop, containerHeight, itemPositions, items, overscan])
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop)
