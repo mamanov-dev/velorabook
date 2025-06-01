@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { env } from './src/lib/env-safe';
+// import { env } from './src/lib/env-safe'; // УБРАНО - вызывало ошибки сборки
 const path = require('path');
 
 // Опциональный bundle analyzer - только если доступен
@@ -48,11 +48,11 @@ const nextConfig: NextConfig = {
   },
 
   compiler: {
-    removeConsole: env.NODE_ENV === 'production' ? {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],
     } : false,
     emotion: false,
-    reactRemoveProperties: env.NODE_ENV === 'production',
+    reactRemoveProperties: process.env.NODE_ENV === 'production',
   },
 
   async headers() {
@@ -66,7 +66,7 @@ const nextConfig: NextConfig = {
       { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
     ];
 
-    if (env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production') {
       securityHeaders.push({
         key: 'Content-Security-Policy',
         value: [
@@ -178,7 +178,7 @@ const nextConfig: NextConfig = {
     buildDate: new Date().toISOString(),
   },
 
-  output: env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   pageExtensions: ['ts', 'tsx', 'js', 'jsx'],
   trailingSlash: false,
 
