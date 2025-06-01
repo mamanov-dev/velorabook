@@ -16,8 +16,8 @@ module.exports = {
         serif: ['Georgia', 'serif'],
       },
       animation: {
-        'spin': 'spin 1s linear infinite',
-        'pulse': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'fade-in': 'fadeIn 0.5s ease-in-out',
+        'slide-up': 'slideUp 0.6s ease-out',
       }
     },
   },
