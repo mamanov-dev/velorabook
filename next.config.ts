@@ -1,10 +1,18 @@
 import type { NextConfig } from "next";
-import { env } from './src/lib/env';
+import { env } from './src/lib/env-safe';
 const path = require('path');
 
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-});
+// Опциональный bundle analyzer - только если доступен
+let withBundleAnalyzer: any;
+try {
+  withBundleAnalyzer = require('@next/bundle-analyzer')({
+    enabled: process.env.ANALYZE === 'true',
+  });
+} catch (error) {
+  // Bundle analyzer не установлен - используем identity function
+  withBundleAnalyzer = (config: NextConfig) => config;
+  console.log('⚠️ @next/bundle-analyzer not available, skipping bundle analysis');
+}
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -20,11 +28,6 @@ const nextConfig: NextConfig = {
   },
 
   experimental: {
-    optimizeCss: false,
-    optimizePackageImports: [
-      'lucide-react',
-      'next-auth',
-    ],
     staleTimes: {
       dynamic: 30,
       static: 180,
@@ -196,8 +199,6 @@ const nextConfig: NextConfig = {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
   },
-
-  ...(process.env.ANALYZE === 'true' && {}),
 };
 
 module.exports = withBundleAnalyzer(nextConfig);
